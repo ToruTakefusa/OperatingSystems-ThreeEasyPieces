@@ -1,9 +1,11 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/time.h>
 #include <sys/uio.h>
+#include <sched.h>
 
 void systemCallChallenge(int fd);
 void challengeFork();
@@ -23,7 +25,7 @@ int main() {
     int fd = open("foo.txt", O_RDWR);
     gettimeofday(&time1, NULL);
 
-    const int SYS_CALL_COUNT = 30;
+    const int SYS_CALL_COUNT = 10000000;
     for (int i = 0; i < SYS_CALL_COUNT ; i++ ) {
         systemCallChallenge(fd);
     }
@@ -52,10 +54,17 @@ void systemCallChallenge(int fd) {
 
 void challengeFork() {
     int fd1[2], fd2[2];
+    cpu_set_t cpu_set;
     int rc = fork();
+
+    CPU_ZERO(&cpu_set);
+    CPU_SET(0, &cpu_set);
+    
+
     if (rc < 0) {
         fprintf(stderr, "fork() failed\n");
     } else if (rc == 0) {
+        sched_setaffinity(getpid, sizeof(cpu_set_t), &cpu_set);
         int count = 0;
         // change fd1[1] standard output
         dup2(fd1[1], 1);
@@ -68,6 +77,7 @@ void challengeFork() {
         fgets(line, sizeof(line), stdin);
         exit(0);
     } else {
+        sched_setaffinity(getpid, sizeof(cpu_set_t), &cpu_set);
         int count = 0;
         // change fd1[0] standard input
         dup2(fd1[0], 0);

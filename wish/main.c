@@ -3,13 +3,14 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <stdnoreturn.h>
 
 void GetToken(char *line, char* tokens[], int *length);
 void EliminateNewLineCharacter(char *line);
 void ReportError(void);
-void MakePath(char* dir, char* copy_from, char** copy_to);
-void DoInteract(void);
+noreturn void DoInteract(void);
 void ExecuteCommand(char* args[]);
+unsigned long CountSize(char **args);
 
 int main(int argc, char* argv[]) {
 
@@ -34,14 +35,14 @@ void GetToken(char *line, char* tokens[], int *length) {
     // Todo: multiple whitespace.
     EliminateNewLineCharacter(line);
     char *pos_white, *pos_tab;
-    char *WHITE_SPACE = " ", *TAB = "\t";
+    char *WHITE_SPACE = " ", *TAB = "\t", *EMPTY="";
+    char *tmp;
     int count = 0;
     while(1) {
         pos_white = strchr(line, ' ');
         pos_tab = strchr(line, '\t');
 
         if (line == NULL) {
-            *length = count;
             return;
         }
         if ((pos_white == NULL) && (pos_tab == NULL)) {
@@ -49,14 +50,22 @@ void GetToken(char *line, char* tokens[], int *length) {
             tokens[count] = line;
             return;
         } else if ((pos_white != NULL) && (pos_tab == NULL)) {
-            tokens[count] = strsep(&line, WHITE_SPACE);
+            tmp = strsep(&line, WHITE_SPACE);
+            if (!strcmp(tmp, EMPTY)) continue;
+            tokens[count] = tmp;
         } else if ((pos_white == NULL) && (pos_tab != NULL)) {
-            tokens[count] = strsep(&line, TAB);
+            tmp = strsep(&line, TAB);
+            if (!strcmp(tmp, EMPTY)) continue;
+            tokens[count] = tmp;
         } else {
             if (pos_white < pos_tab) {
-                tokens[count] = strsep(&line, WHITE_SPACE);
+                tmp = strsep(&line, WHITE_SPACE);
+                if (!strcmp(tmp, EMPTY)) continue;
+                tokens[count] = tmp;
             } else {
-                tokens[count] = strsep(&line, TAB);
+                tmp = strsep(&line, TAB);
+                if (!strcmp(tmp, EMPTY)) continue;
+                tokens[count] = tmp;
             }
         }
         ++count;
@@ -85,42 +94,47 @@ void ReportError() {
 }
 
 /**
- * @brief MakePath: make path from params.
- * @param dir: directory name which will be appended.
- * @param copy_from
- * @param copy_to: the content of copy_to is dir + copy_from
+ * @brief CountSize: Get size of args. If there is null item, count will stop.
+ * @param args
+ * @return
  */
-void MakePath(char* dir, char* copy_from, char** copy_to)  {
-    int size = sizeof (copy_from) + sizeof (copy_to);
-    char tmp[size];
-    strcat(tmp, dir);
-    strcat(tmp, copy_from);
-    copy_to[0] = tmp;
+unsigned long CountSize(char **args) {
+    unsigned long size = 0;
+    for (int i = 0; args[i] != NULL; ++i) {
+        size += sizeof (args[i]);
+    }
+
+    return size;
 }
 
 /**
  * @brief DoInteract execute in a interactive mode.
  */
-void DoInteract() {
+noreturn void DoInteract() {
     // Todo: divide.
 
     while(1) {
         char *line = NULL;
         size_t line_size = 0;
-        char *to_free;
+        char *to_free1;
 
         printf("wish> ");
         if (getline(&line, &line_size, stdin) == -1) {
             ReportError();
         }
-        to_free = line;
+
+        to_free1 = line;
         char **tokens = malloc(strlen(line));
         int last_index = 0;
         GetToken(line, tokens, &last_index);
+        // Todo: erase.
+        for (int i = 0; i <= last_index; ++i) {
+            printf("toknes[%d] is %s\n", i, tokens[i]);
+        }
 
-        char **cmd = malloc(sizeof (tokens) + sizeof("/bin/"));
+        if ((last_index == 0) && (strcmp(tokens[0], "exit") == 0)) exit(1);
 
-        //Todo MakePath("/bin/", tokens[0], *cmd);
+        char **cmd = malloc(CountSize(tokens) + sizeof ("/bin/"));
         int size = sizeof ("/bin/") + sizeof (tokens[0]);
         char tmp[size];
         strcat(tmp, "/bin/");
@@ -137,9 +151,9 @@ void DoInteract() {
         }
 
         ExecuteCommand(cmd);
-        free(tokens);
         free(cmd);
-        free(to_free);
+        free(tokens);
+        free(to_free1);
     }
 }
 
@@ -156,7 +170,7 @@ void ExecuteCommand(char* args[]) {
     } else if (rc == 0){
         if (execv(args[0], args) == -1) {
             printf("Creating child missed\n");
-            printf("The error is %s", strerror(errno));
+            printf("The error is %s\n", strerror(errno));
             ReportError();
         }
     } else {

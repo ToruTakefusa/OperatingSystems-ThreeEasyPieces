@@ -13,7 +13,7 @@ int main(int argc, char *argv[]) {
     const int NUM_OF_TRIALS = atoi(argv[2]);
     int jump = PAGESIZE / sizeof (int);
     int *to_free, *a;
-    to_free = a = malloc(NUM_OF_PAGES * jump * sizeof (int));
+    to_free = a = calloc(NUM_OF_PAGES * jump, sizeof (int));
     struct timeval start;
     struct timeval end;
     long long int diff[NUM_OF_PAGES * jump];
